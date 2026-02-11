@@ -978,12 +978,34 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   @media (max-width: 768px) {
-    header { padding: 16px 20px; }
-    #filter-bar { padding: 16px 20px; }
-    #grid { padding: 20px; }
-    .filter-results { padding: 10px 20px; }
+    header {
+      padding: 12px 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .header-stats { gap: 16px; order: 3; width: 100%; justify-content: center; padding-top: 6px; border-top: 1px solid var(--border); }
+    .header-actions { gap: 8px; }
+    .header-actions .btn-ghost { display: none; }
+    .btn-random { font-size: 0.72rem; padding: 9px 14px; }
+    .logo { font-size: 1.8rem; }
+
+    #filter-bar { padding: 12px 16px; gap: 10px; }
+    #filter-bar .filter-group { min-width: calc(50% - 5px); }
+    #filter-bar .filter-search { min-width: 100%; max-width: 100%; }
+    select { min-width: unset; width: 100%; }
+
+    .filter-results { padding: 10px 16px; flex-direction: column; align-items: flex-start; gap: 8px; }
+
+    #grid { padding: 16px; gap: 12px; --card-w: 140px; }
+
     .modal-hero { flex-direction: column; }
-    .modal-poster, .modal-poster-placeholder { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+    .modal-poster { width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+    .modal-poster-placeholder { width: 100%; aspect-ratio: 16/9; }
+    .modal-hero-info { padding: 20px; }
+    .modal-actions { padding: 16px; flex-wrap: wrap; }
+
+    .random-modal { padding: 32px 20px; margin: 0 16px; }
+    .fix-modal { margin: 0 16px; padding: 24px 20px; }
   }
 </style>
 </head>
@@ -1216,7 +1238,7 @@ async function sbFetch(path, options = {}) {
 
 async function sbLoadMovies() {
   const rows = await sbFetch('movies?select=id,data&order=id');
-  return (rows || []).map(r => r.data);
+  return (rows || []).map(r => ({ ...r.data, id: String(r.data.id) }));
 }
 
 async function sbSaveMovie(movie) {
@@ -1233,7 +1255,7 @@ async function sbDeleteMovie(id) {
 
 async function sbLoadWatched() {
   const rows = await sbFetch('watched?select=movie_id');
-  return new Set((rows || []).map(r => r.movie_id));
+  return new Set((rows || []).map(r => String(r.movie_id)));
 }
 
 async function sbSetWatched(movieId, watched) {
@@ -1431,7 +1453,7 @@ async function fetchMovie(titleStr) {
   const detail = await fetchMovieDetail(result.id);
 
   return {
-    id: result.id,
+    id: String(result.id),
     searchTitle: titleStr,
     title: result.title,
     originalTitle: result.original_title,
@@ -1447,7 +1469,7 @@ async function fetchMovie(titleStr) {
     cast: detail?.credits?.cast?.slice(0,4).map(c => c.name) || [],
     countries: detail?.production_countries?.map(c => c.name) || [],
     language: detail?.original_language || result.original_language,
-    tmdbId: result.id,
+    tmdbId: String(result.id),
     notFound: false
   };
 }
@@ -1625,7 +1647,7 @@ function renderGrid() {
 
     card.innerHTML = `
       <div class="card-watched-badge">✓ Seen</div>
-      <button class="card-edit-btn" onclick="event.stopPropagation();openFixModal(${JSON.stringify(movie.id)})">✎ Fix</button>
+      <button class="card-edit-btn" onclick="event.stopPropagation();openFixModal(${JSON.stringify(String(movie.id))})">✎ Fix</button>
       ${posterHTML}
       <div class="card-info">
         <div class="card-title">${escHtml(movie.title)}</div>
@@ -1685,7 +1707,7 @@ function openModal(movie) {
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-actions">
-      <button class="btn-watch-toggle ${isWatched ? 'watched' : ''}" onclick="toggleWatched(${JSON.stringify(movie.id)}, this)">
+      <button class="btn-watch-toggle ${isWatched ? 'watched' : ''}" onclick="toggleWatched(${JSON.stringify(String(movie.id))}, this)">
         ${isWatched ? '✓ Marked as Watched' : '○ Mark as Watched'}
       </button>
       ${movie.tmdbId ? `<a class="btn-tmdb-link" href="${tmdbURL}" target="_blank" rel="noopener">View on TMDB ↗</a>` : ''}
@@ -1826,7 +1848,7 @@ async function fixByTmdbId() {
     if (!detail || detail.status_code === 34) { setFixStatus('Movie not found for that ID.', true); return; }
 
     const movie = {
-      id: detail.id,
+      id: String(detail.id),
       searchTitle: detail.title,
       title: detail.title,
       originalTitle: detail.original_title,
@@ -1842,7 +1864,7 @@ async function fixByTmdbId() {
       cast: detail.credits?.cast?.slice(0,4).map(c => c.name) || [],
       countries: detail.production_countries?.map(c => c.name) || [],
       language: detail.original_language,
-      tmdbId: detail.id,
+      tmdbId: String(detail.id),
       notFound: false
     };
     applyMovieFix(movie);
