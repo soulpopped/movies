@@ -1718,6 +1718,7 @@ function openModal(movie) {
 
 function closeModal() {
   document.getElementById('modal-overlay').classList.remove('active');
+  applyFilters(); // refresh grid now that modal is closed
 }
 function handleModalOverlayClick(e) {
   if (e.target === document.getElementById('modal-overlay')) closeModal();
@@ -1725,19 +1726,31 @@ function handleModalOverlayClick(e) {
 
 // ── WATCHED ────────────────────────────────────────────────────────────────
 async function toggleWatched(id, btn) {
-  const nowWatched = !watchedSet.has(id);
+  const strId = String(id);
+  const nowWatched = !watchedSet.has(strId);
+
   if (nowWatched) {
-    watchedSet.add(id);
+    watchedSet.add(strId);
+  } else {
+    watchedSet.delete(strId);
+  }
+
+  // Update button appearance from the new truth, not a toggle assumption
+  if (watchedSet.has(strId)) {
     btn.classList.add('watched');
     btn.textContent = '✓ Marked as Watched';
   } else {
-    watchedSet.delete(id);
     btn.classList.remove('watched');
     btn.textContent = '○ Mark as Watched';
   }
+
   updateStats();
-  applyFilters();
-  try { await sbSetWatched(id, nowWatched); } catch(e) { console.warn('Watched sync failed', e); }
+  // Only re-render grid if modal is closed, to avoid stale button references
+  if (!document.getElementById('modal-overlay').classList.contains('active')) {
+    applyFilters();
+  }
+
+  try { await sbSetWatched(strId, watchedSet.has(strId)); } catch(e) { console.warn('Watched sync failed', e); }
 }
 
 // ── RANDOM PICK ─────────────────────────────────────────────────────────────
