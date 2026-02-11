@@ -1200,12 +1200,57 @@ let apiKey = '';
 const TMDB_BASE = 'https://api.themoviedb.org/3';
 const TMDB_IMG = 'https://image.tmdb.org/t/p/w342';
 const TMDB_IMG_LG = 'https://image.tmdb.org/t/p/w500';
-const STORAGE_KEY_MOVIES = 'reel_movies_v2';
-const STORAGE_KEY_WATCHED = 'reel_watched_v2';
 const STORAGE_KEY_APIKEY = 'reel_apikey';
 
+// ── SUPABASE CONFIG ────────────────────────────────────────────────────────
+const SB_URL = 'https://lpfixzzzboopszwueidp.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxwZml4enp6Ym9vcHN6d3VlaWRwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NDg4MjIsImV4cCI6MjA4NjQyNDgyMn0.xeX1dMHsJGVZPnMwIyZASQoVo7OWC-0Qj7Eq5V8KwW8';
+const SB_HEADERS = { 'Content-Type': 'application/json', 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` };
+
+async function sbFetch(path, options = {}) {
+  const res = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: SB_HEADERS, ...options });
+  if (!res.ok) { const err = await res.text(); throw new Error(`Supabase error: ${err}`); }
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+async function sbLoadMovies() {
+  const rows = await sbFetch('movies?select=id,data&order=id');
+  return (rows || []).map(r => r.data);
+}
+
+async function sbSaveMovie(movie) {
+  await sbFetch('movies', {
+    method: 'POST',
+    headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
+    body: JSON.stringify({ id: String(movie.id), data: movie, updated_at: new Date().toISOString() })
+  });
+}
+
+async function sbDeleteMovie(id) {
+  await sbFetch(`movies?id=eq.${encodeURIComponent(String(id))}`, { method: 'DELETE' });
+}
+
+async function sbLoadWatched() {
+  const rows = await sbFetch('watched?select=movie_id');
+  return new Set((rows || []).map(r => r.movie_id));
+}
+
+async function sbSetWatched(movieId, watched) {
+  const id = String(movieId);
+  if (watched) {
+    await sbFetch('watched', {
+      method: 'POST',
+      headers: { ...SB_HEADERS, 'Prefer': 'resolution=merge-duplicates' },
+      body: JSON.stringify({ movie_id: id, watched_at: new Date().toISOString() })
+    });
+  } else {
+    await sbFetch(`watched?movie_id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
+  }
+}
+
 // ── INIT ───────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
   const savedKey = localStorage.getItem(STORAGE_KEY_APIKEY);
   if (savedKey) {
     apiKey = savedKey;
@@ -1213,17 +1258,20 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('api-key-status').textContent = '✓ API key loaded from storage';
   }
 
-  const savedWatched = localStorage.getItem(STORAGE_KEY_WATCHED);
-  if (savedWatched) {
-    watchedSet = new Set(JSON.parse(savedWatched));
-  }
+  // Show a subtle loading state
+  document.getElementById('import-panel').style.display = 'block';
+  const sub = document.getElementById('api-key-status');
 
-  const savedMovies = localStorage.getItem(STORAGE_KEY_MOVIES);
-  if (savedMovies) {
-    movies = JSON.parse(savedMovies);
-    if (movies.length > 0) {
-      showApp();
-    }
+  try {
+    sub.textContent = '⟳ Syncing your list…';
+    const [loadedMovies, loadedWatched] = await Promise.all([sbLoadMovies(), sbLoadWatched()]);
+    movies = loadedMovies;
+    watchedSet = loadedWatched;
+    sub.textContent = savedKey ? '✓ API key loaded from storage' : '';
+    if (movies.length > 0) showApp();
+  } catch(e) {
+    console.error('Supabase load error:', e);
+    sub.textContent = '⚠ Could not connect to sync — working offline';
   }
 });
 
@@ -1353,7 +1401,12 @@ async function startImport() {
   }
 
   movies = [...movies, ...results];
-  localStorage.setItem(STORAGE_KEY_MOVIES, JSON.stringify(movies));
+
+  // Save all new movies to Supabase
+  document.getElementById('progress-sub').textContent = 'Saving to cloud…';
+  for (const movie of results) {
+    try { await sbSaveMovie(movie); } catch(e) { console.warn('Save failed for', movie.title, e); }
+  }
 
   document.getElementById('progress-overlay').classList.remove('active');
   showApp();
@@ -1649,19 +1702,20 @@ function handleModalOverlayClick(e) {
 }
 
 // ── WATCHED ────────────────────────────────────────────────────────────────
-function toggleWatched(id, btn) {
-  if (watchedSet.has(id)) {
-    watchedSet.delete(id);
-    btn.classList.remove('watched');
-    btn.textContent = '○ Mark as Watched';
-  } else {
+async function toggleWatched(id, btn) {
+  const nowWatched = !watchedSet.has(id);
+  if (nowWatched) {
     watchedSet.add(id);
     btn.classList.add('watched');
     btn.textContent = '✓ Marked as Watched';
+  } else {
+    watchedSet.delete(id);
+    btn.classList.remove('watched');
+    btn.textContent = '○ Mark as Watched';
   }
-  localStorage.setItem(STORAGE_KEY_WATCHED, JSON.stringify([...watchedSet]));
   updateStats();
   applyFilters();
+  try { await sbSetWatched(id, nowWatched); } catch(e) { console.warn('Watched sync failed', e); }
 }
 
 // ── RANDOM PICK ─────────────────────────────────────────────────────────────
@@ -1703,13 +1757,13 @@ function closeRandom() {
   document.getElementById('random-overlay').classList.remove('active');
 }
 
-function watchRandomNow() {
+async function watchRandomNow() {
   if (!currentRandomMovie) return;
   watchedSet.add(currentRandomMovie.id);
-  localStorage.setItem(STORAGE_KEY_WATCHED, JSON.stringify([...watchedSet]));
   updateStats();
   applyFilters();
   closeRandom();
+  try { await sbSetWatched(currentRandomMovie.id, true); } catch(e) { console.warn('Watched sync failed', e); }
 }
 
 // ── FIX MODAL ─────────────────────────────────────────────────────────────
@@ -1797,37 +1851,48 @@ async function fixByTmdbId() {
   }
 }
 
-function applyMovieFix(newMovieData) {
+async function applyMovieFix(newMovieData) {
   const idx = movies.findIndex(m => m.id === fixTargetId);
   if (idx === -1) return;
 
-  // If the ID changed (different TMDB result), migrate watched state
+  // If the ID changed, migrate watched state
   const wasWatched = watchedSet.has(fixTargetId);
   if (wasWatched && newMovieData.id !== fixTargetId) {
     watchedSet.delete(fixTargetId);
     watchedSet.add(newMovieData.id);
-    localStorage.setItem(STORAGE_KEY_WATCHED, JSON.stringify([...watchedSet]));
+    try {
+      await sbSetWatched(fixTargetId, false);
+      await sbSetWatched(newMovieData.id, true);
+    } catch(e) { console.warn('Watched migrate failed', e); }
+  }
+
+  // Delete old record if ID changed
+  if (newMovieData.id !== fixTargetId) {
+    try { await sbDeleteMovie(fixTargetId); } catch(e) { console.warn('Delete old failed', e); }
   }
 
   movies[idx] = { ...newMovieData, searchTitle: movies[idx].searchTitle || newMovieData.title };
-  localStorage.setItem(STORAGE_KEY_MOVIES, JSON.stringify(movies));
+  try { await sbSaveMovie(movies[idx]); } catch(e) { console.warn('Save fix failed', e); }
+
   buildFilterOptions();
   applyFilters();
   updateStats();
   setFixStatus(`✓ Updated to "${newMovieData.title}" (${newMovieData.year})`);
-
   setTimeout(closeFixModal, 1200);
 }
 
-function removeMovie() {
+async function removeMovie() {
   if (!fixTargetId) return;
   const movie = movies.find(m => m.id === fixTargetId);
   if (!confirm(`Remove "${movie?.title || 'this film'}" from your list?`)) return;
 
   movies = movies.filter(m => m.id !== fixTargetId);
   watchedSet.delete(fixTargetId);
-  localStorage.setItem(STORAGE_KEY_MOVIES, JSON.stringify(movies));
-  localStorage.setItem(STORAGE_KEY_WATCHED, JSON.stringify([...watchedSet]));
+  try {
+    await sbDeleteMovie(fixTargetId);
+    await sbSetWatched(fixTargetId, false);
+  } catch(e) { console.warn('Remove failed', e); }
+
   buildFilterOptions();
   applyFilters();
   updateStats();
