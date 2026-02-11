@@ -1647,7 +1647,7 @@ function renderGrid() {
 
     card.innerHTML = `
       <div class="card-watched-badge">✓ Seen</div>
-      <button class="card-edit-btn" onclick="event.stopPropagation();openFixModal(${JSON.stringify(String(movie.id))})">✎ Fix</button>
+      <button class="card-edit-btn" data-fix-id="${escHtml(String(movie.id))}" onclick="openFixModal(this.getAttribute('data-fix-id'));event.stopPropagation()">✎ Fix</button>
       ${posterHTML}
       <div class="card-info">
         <div class="card-title">${escHtml(movie.title)}</div>
@@ -1707,7 +1707,7 @@ function openModal(movie) {
       <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
     <div class="modal-actions">
-      <button class="btn-watch-toggle ${isWatched ? 'watched' : ''}" onclick="toggleWatched(${JSON.stringify(String(movie.id))}, this)">
+      <button class="btn-watch-toggle ${isWatched ? 'watched' : ''}" data-movie-id="${escHtml(String(movie.id))}" onclick="handleWatchToggle(this)">
         ${isWatched ? '✓ Marked as Watched' : '○ Mark as Watched'}
       </button>
       ${movie.tmdbId ? `<a class="btn-tmdb-link" href="${tmdbURL}" target="_blank" rel="noopener">View on TMDB ↗</a>` : ''}
@@ -1725,6 +1725,11 @@ function handleModalOverlayClick(e) {
 }
 
 // ── WATCHED ────────────────────────────────────────────────────────────────
+function handleWatchToggle(btn) {
+  const id = btn.getAttribute('data-movie-id');
+  toggleWatched(id, btn);
+}
+
 async function toggleWatched(id, btn) {
   const strId = String(id);
   const nowWatched = !watchedSet.has(strId);
