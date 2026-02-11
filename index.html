@@ -852,6 +852,131 @@
     min-width: 52px;
   }
 
+  /* ── FIX MODAL ── */
+  #fix-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  #fix-overlay.active { display: flex; }
+
+  .fix-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 3px;
+    animation: modalIn 0.2s ease;
+    padding: 32px;
+  }
+  .fix-modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.5rem;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .fix-modal-sub {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-bottom: 28px;
+  }
+  .fix-modal-sub strong { color: var(--accent); font-style: normal; font-weight: 500; }
+
+  .fix-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .fix-section:last-of-type { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+  .fix-section-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .fix-row {
+    display: flex;
+    gap: 8px;
+  }
+  .fix-row input {
+    flex: 1;
+  }
+  .fix-hint {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-top: 7px;
+    font-style: italic;
+  }
+  .fix-hint a { color: var(--text-muted); }
+
+  .btn-danger {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 9px 16px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+  }
+  .btn-danger:hover { background: var(--accent2); color: white; }
+
+  .fix-close-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 24px;
+  }
+
+  /* ── CARD EDIT BUTTON ── */
+  .card-edit-btn {
+    position: absolute;
+    bottom: 52px;
+    right: 8px;
+    background: rgba(10,10,10,0.85);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 0.6rem;
+    font-family: 'DM Sans', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 4px 7px;
+    border-radius: 2px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+    z-index: 3;
+  }
+  .card:hover .card-edit-btn { opacity: 1; }
+  .card-edit-btn:hover { color: var(--accent); border-color: var(--accent); background: rgba(10,10,10,0.95); }
+
+  /* ── FIX SPINNER ── */
+  .fix-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   @media (max-width: 768px) {
     header { padding: 16px 20px; }
     #filter-bar { padding: 16px 20px; }
@@ -884,6 +1009,43 @@
       <button class="btn btn-ghost" onclick="closeRandom()">Maybe later</button>
       <button class="btn btn-random" onclick="rollAgain()">⚄ Roll again</button>
       <button class="btn btn-accent" onclick="watchRandomNow()">Mark watched</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIX MOVIE MODAL -->
+<div id="fix-overlay" onclick="handleFixOverlayClick(event)">
+  <div class="fix-modal">
+    <div class="fix-modal-title">Fix This Film</div>
+    <div class="fix-modal-sub">Having trouble with <strong id="fix-movie-name"></strong>?</div>
+
+    <div class="fix-section">
+      <div class="fix-section-label">Re-search by title</div>
+      <div class="fix-row">
+        <input type="text" id="fix-title-input" placeholder="e.g. Solaris 1972">
+        <button class="btn btn-accent" style="white-space:nowrap;padding:9px 16px" onclick="fixByTitle()">Search</button>
+      </div>
+      <div class="fix-hint">Try adding a year, or the original-language title</div>
+    </div>
+
+    <div class="fix-section">
+      <div class="fix-section-label">Look up by TMDB ID</div>
+      <div class="fix-row">
+        <input type="text" id="fix-tmdbid-input" placeholder="e.g. 637">
+        <button class="btn btn-accent" style="white-space:nowrap;padding:9px 16px" onclick="fixByTmdbId()">Fetch</button>
+      </div>
+      <div class="fix-hint">Find the ID in the URL at <a href="https://www.themoviedb.org" target="_blank">themoviedb.org</a> — most reliable for foreign/obscure films</div>
+    </div>
+
+    <div class="fix-section">
+      <div class="fix-section-label">Remove from list</div>
+      <button class="btn-danger" onclick="removeMovie()">✕ Remove this film entirely</button>
+    </div>
+
+    <div id="fix-status" style="font-size:0.75rem;color:var(--text-muted);font-style:italic;min-height:18px;margin-top:16px"></div>
+
+    <div class="fix-close-row">
+      <button class="btn btn-ghost" onclick="closeFixModal()">Cancel</button>
     </div>
   </div>
 </div>
@@ -1410,6 +1572,7 @@ function renderGrid() {
 
     card.innerHTML = `
       <div class="card-watched-badge">✓ Seen</div>
+      <button class="card-edit-btn" onclick="event.stopPropagation();openFixModal(${JSON.stringify(movie.id)})">✎ Fix</button>
       ${posterHTML}
       <div class="card-info">
         <div class="card-title">${escHtml(movie.title)}</div>
@@ -1549,6 +1712,128 @@ function watchRandomNow() {
   closeRandom();
 }
 
+// ── FIX MODAL ─────────────────────────────────────────────────────────────
+let fixTargetId = null;
+
+function openFixModal(movieId) {
+  fixTargetId = movieId;
+  const movie = movies.find(m => m.id === movieId);
+  if (!movie) return;
+
+  document.getElementById('fix-movie-name').textContent = movie.title || movie.searchTitle;
+  document.getElementById('fix-title-input').value = movie.searchTitle || movie.title || '';
+  document.getElementById('fix-tmdbid-input').value = '';
+  document.getElementById('fix-status').textContent = '';
+  document.getElementById('fix-overlay').classList.add('active');
+}
+
+function closeFixModal() {
+  document.getElementById('fix-overlay').classList.remove('active');
+  fixTargetId = null;
+}
+
+function handleFixOverlayClick(e) {
+  if (e.target === document.getElementById('fix-overlay')) closeFixModal();
+}
+
+function setFixStatus(msg, isError) {
+  const el = document.getElementById('fix-status');
+  el.style.color = isError ? 'var(--accent2)' : 'var(--text-muted)';
+  el.innerHTML = msg;
+}
+
+async function fixByTitle() {
+  if (!apiKey) { setFixStatus('No API key set.', true); return; }
+  const title = document.getElementById('fix-title-input').value.trim();
+  if (!title) { setFixStatus('Enter a title to search.', true); return; }
+
+  setFixStatus('<span class="fix-spinner"></span>Searching…');
+
+  try {
+    const movie = await fetchMovie(title);
+    if (!movie) { setFixStatus('No results found. Try a different title or use TMDB ID.', true); return; }
+    applyMovieFix(movie);
+  } catch(e) {
+    setFixStatus('Error fetching data. Check your API key.', true);
+  }
+}
+
+async function fixByTmdbId() {
+  if (!apiKey) { setFixStatus('No API key set.', true); return; }
+  const rawId = document.getElementById('fix-tmdbid-input').value.trim();
+  if (!rawId) { setFixStatus('Enter a TMDB ID.', true); return; }
+  const id = parseInt(rawId);
+  if (isNaN(id)) { setFixStatus('ID must be a number.', true); return; }
+
+  setFixStatus('<span class="fix-spinner"></span>Fetching…');
+
+  try {
+    const detail = await fetchMovieDetail(id);
+    if (!detail || detail.status_code === 34) { setFixStatus('Movie not found for that ID.', true); return; }
+
+    const movie = {
+      id: detail.id,
+      searchTitle: detail.title,
+      title: detail.title,
+      originalTitle: detail.original_title,
+      year: detail.release_date ? detail.release_date.split('-')[0] : '—',
+      overview: detail.overview,
+      poster: detail.poster_path ? TMDB_IMG + detail.poster_path : null,
+      posterLg: detail.poster_path ? TMDB_IMG_LG + detail.poster_path : null,
+      rating: detail.vote_average ? Math.round(detail.vote_average * 10) / 10 : null,
+      voteCount: detail.vote_count,
+      genres: detail.genres?.map(g => g.name) || [],
+      runtime: detail.runtime || null,
+      director: detail.credits?.crew?.find(c => c.job === 'Director')?.name || null,
+      cast: detail.credits?.cast?.slice(0,4).map(c => c.name) || [],
+      countries: detail.production_countries?.map(c => c.name) || [],
+      language: detail.original_language,
+      tmdbId: detail.id,
+      notFound: false
+    };
+    applyMovieFix(movie);
+  } catch(e) {
+    setFixStatus('Error fetching data. Check your API key.', true);
+  }
+}
+
+function applyMovieFix(newMovieData) {
+  const idx = movies.findIndex(m => m.id === fixTargetId);
+  if (idx === -1) return;
+
+  // If the ID changed (different TMDB result), migrate watched state
+  const wasWatched = watchedSet.has(fixTargetId);
+  if (wasWatched && newMovieData.id !== fixTargetId) {
+    watchedSet.delete(fixTargetId);
+    watchedSet.add(newMovieData.id);
+    localStorage.setItem(STORAGE_KEY_WATCHED, JSON.stringify([...watchedSet]));
+  }
+
+  movies[idx] = { ...newMovieData, searchTitle: movies[idx].searchTitle || newMovieData.title };
+  localStorage.setItem(STORAGE_KEY_MOVIES, JSON.stringify(movies));
+  buildFilterOptions();
+  applyFilters();
+  updateStats();
+  setFixStatus(`✓ Updated to "${newMovieData.title}" (${newMovieData.year})`);
+
+  setTimeout(closeFixModal, 1200);
+}
+
+function removeMovie() {
+  if (!fixTargetId) return;
+  const movie = movies.find(m => m.id === fixTargetId);
+  if (!confirm(`Remove "${movie?.title || 'this film'}" from your list?`)) return;
+
+  movies = movies.filter(m => m.id !== fixTargetId);
+  watchedSet.delete(fixTargetId);
+  localStorage.setItem(STORAGE_KEY_MOVIES, JSON.stringify(movies));
+  localStorage.setItem(STORAGE_KEY_WATCHED, JSON.stringify([...watchedSet]));
+  buildFilterOptions();
+  applyFilters();
+  updateStats();
+  closeFixModal();
+}
+
 // ── UTILS ──────────────────────────────────────────────────────────────────
 function escHtml(str) {
   if (!str) return '';
@@ -1560,6 +1845,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closeModal();
     closeRandom();
+    closeFixModal();
   }
 });
 </script>
