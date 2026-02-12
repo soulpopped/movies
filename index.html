@@ -6,11 +6,6 @@
 <title>REEL — Movie Watchlist</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
-<link rel="apple-touch-icon" href="icon.svg">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Reel">
 <style>
   :root {
     --bg: #0a0a0a;
@@ -857,7 +852,90 @@
     min-width: 52px;
   }
 
-  /* ── FIX MODAL ── */
+  /* ── PASSWORD GATE ── */
+  #pw-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0;
+  }
+  #pw-overlay.unlocked { display: none; }
+  .pw-box {
+    text-align: center;
+    padding: 48px 40px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    width: 100%;
+    max-width: 360px;
+    margin: 0 16px;
+    animation: modalIn 0.3s ease;
+  }
+  .pw-logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 3rem;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .pw-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    margin-bottom: 36px;
+  }
+  .pw-input-wrap { position: relative; margin-bottom: 12px; }
+  .pw-input-wrap input {
+    width: 100%;
+    text-align: center;
+    font-size: 1rem;
+    letter-spacing: 0.2em;
+    padding: 12px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .pw-input-wrap input:focus { border-color: var(--accent); }
+  .pw-input-wrap input.error { border-color: var(--accent2); animation: shake 0.3s ease; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+  .pw-error {
+    font-size: 0.72rem;
+    color: var(--accent2);
+    min-height: 18px;
+    margin-bottom: 12px;
+    font-style: italic;
+  }
+  .pw-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--accent);
+    color: #0a0a0a;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: background 0.2s;
+  }
+  .pw-btn:hover { background: #f0d060; }
+
   #fix-overlay {
     display: none;
     position: fixed;
@@ -1015,6 +1093,19 @@
 </style>
 </head>
 <body>
+
+<!-- PASSWORD GATE -->
+<div id="pw-overlay">
+  <div class="pw-box">
+    <div class="pw-logo">Reel</div>
+    <div class="pw-sub">Your Watchlist</div>
+    <div class="pw-input-wrap">
+      <input type="password" id="pw-input" placeholder="Password" onkeydown="if(event.key==='Enter')checkPassword()">
+    </div>
+    <div class="pw-error" id="pw-error"></div>
+    <button class="pw-btn" onclick="checkPassword()">Unlock →</button>
+  </div>
+</div>
 
 <!-- PROGRESS OVERLAY -->
 <div id="progress-overlay">
@@ -1276,8 +1367,54 @@ async function sbSetWatched(movieId, watched) {
   }
 }
 
+// ── PASSWORD GATE ─────────────────────────────────────────────────────────
+const PW_HASH = '3a4d5b6c7e1f2a8b9c0d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b'; // paddington
+const STORAGE_KEY_AUTH = 'reel_auth';
+
+function simpleHash(str) {
+  // Simple deterministic hash for password checking
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(16);
+}
+
+const CORRECT_HASH = simpleHash('paddington');
+
+function checkPassword() {
+  const val = document.getElementById('pw-input').value;
+  const input = document.getElementById('pw-input');
+  const error = document.getElementById('pw-error');
+
+  if (simpleHash(val) === CORRECT_HASH) {
+    localStorage.setItem(STORAGE_KEY_AUTH, CORRECT_HASH);
+    document.getElementById('pw-overlay').classList.add('unlocked');
+    error.textContent = '';
+  } else {
+    input.classList.add('error');
+    error.textContent = 'Incorrect password';
+    input.value = '';
+    setTimeout(() => input.classList.remove('error'), 400);
+  }
+}
+
+function checkAuth() {
+  const saved = localStorage.getItem(STORAGE_KEY_AUTH);
+  if (saved === CORRECT_HASH) {
+    document.getElementById('pw-overlay').classList.add('unlocked');
+    return true;
+  }
+  // Focus the input for convenience
+  setTimeout(() => document.getElementById('pw-input').focus(), 100);
+  return false;
+}
+
 // ── INIT ───────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  checkAuth();
+
   const savedKey = localStorage.getItem(STORAGE_KEY_APIKEY);
   if (savedKey) {
     apiKey = savedKey;
