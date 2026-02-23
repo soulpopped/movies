@@ -208,7 +208,7 @@
     border: 1px solid var(--border);
     color: var(--text);
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.85rem;
+    font-size: 16px;
     padding: 16px;
     resize: vertical;
     border-radius: 2px;
@@ -246,7 +246,7 @@
     border: 1px solid var(--border);
     color: var(--text);
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.85rem;
+    font-size: 16px;
     padding: 10px 14px;
     border-radius: 2px;
     outline: none;
@@ -338,7 +338,7 @@
     border: 1px solid var(--border);
     color: var(--text);
     font-family: 'DM Sans', sans-serif;
-    font-size: 0.8rem;
+    font-size: 16px;
     padding: 8px 32px 8px 12px;
     border-radius: 2px;
     outline: none;
@@ -362,7 +362,7 @@
     background: var(--bg);
     border: 1px solid var(--border);
     color: var(--text);
-    font-size: 0.8rem;
+    font-size: 16px;
     padding: 8px 12px;
     border-radius: 2px;
   }
@@ -1184,6 +1184,8 @@
     <div class="stat"><div class="stat-num" id="stat-pct">0%</div><div class="stat-label">Progress</div></div>
   </div>
   <div class="header-actions">
+    <button class="btn btn-ghost" onclick="syncFromCloud()" title="Refresh from cloud" style="padding:10px 12px">⟳</button>
+    <button class="btn btn-ghost" onclick="resetFilters()" title="Reset all filters">Reset</button>
     <button class="btn btn-ghost" onclick="showImport()">+ Add Films</button>
     <button class="btn btn-random" onclick="pickRandom()">⚄ Pick One For Me</button>
   </div>
@@ -1594,6 +1596,10 @@ async function fetchMovie(titleStr) {
   // Fetch details for runtime, genres, credits
   const detail = await fetchMovieDetail(result.id);
 
+  // Extract US watch providers (flatrate = subscription streaming)
+  const providers = detail?.['watch/providers']?.results?.US?.flatrate || [];
+  const streamingOn = providers.slice(0, 3).map(p => p.provider_name);
+
   return {
     id: String(result.id),
     searchTitle: titleStr,
@@ -1612,12 +1618,13 @@ async function fetchMovie(titleStr) {
     countries: detail?.production_countries?.map(c => c.name) || [],
     language: detail?.original_language || result.original_language,
     tmdbId: String(result.id),
+    streamingOn,
     notFound: false
   };
 }
 
 async function fetchMovieDetail(id) {
-  const url = `${TMDB_BASE}/movie/${id}?api_key=${apiKey}&append_to_response=credits`;
+  const url = `${TMDB_BASE}/movie/${id}?api_key=${apiKey}&append_to_response=credits,watch/providers`;
   const res = await fetch(url);
   return await res.json();
 }
@@ -1639,6 +1646,45 @@ function showImport() {
   document.getElementById('import-panel').style.display = 'block';
   document.getElementById('main-header').style.display = 'none';
   document.getElementById('app').classList.remove('active');
+}
+
+function resetFilters() {
+  document.getElementById('search-input').value = '';
+  document.getElementById('filter-genre').value = '';
+  document.getElementById('filter-decade').value = '';
+  document.getElementById('filter-country').value = '';
+  document.getElementById('filter-lang').value = '';
+  document.getElementById('filter-rating').value = '';
+  document.getElementById('filter-runtime').value = '300';
+  updateRuntimeLabel();
+  document.querySelectorAll('[data-status]').forEach(b => b.classList.remove('active'));
+  document.querySelector('[data-status="all"]').classList.add('active');
+  currentStatusFilter = 'all';
+  applyFilters();
+}
+
+async function syncFromCloud() {
+  const btn = event.target;
+  btn.textContent = '⟳';
+  btn.disabled = true;
+  btn.style.opacity = '0.5';
+  btn.style.animation = 'spin 1s linear infinite';
+
+  try {
+    const [loadedMovies, loadedWatched] = await Promise.all([sbLoadMovies(), sbLoadWatched()]);
+    movies = loadedMovies;
+    watchedSet = loadedWatched;
+    buildFilterOptions();
+    applyFilters();
+    updateStats();
+    btn.textContent = '✓';
+    setTimeout(() => { btn.textContent = '⟳'; btn.style.opacity = '1'; btn.disabled = false; btn.style.animation = ''; }, 800);
+  } catch(e) {
+    console.error('Sync error:', e);
+    btn.textContent = '✕';
+    btn.style.color = 'var(--accent2)';
+    setTimeout(() => { btn.textContent = '⟳'; btn.style.color = ''; btn.style.opacity = '1'; btn.disabled = false; btn.style.animation = ''; }, 1500);
+  }
 }
 
 // ── FILTER OPTIONS ─────────────────────────────────────────────────────────
@@ -1843,6 +1889,7 @@ function openModal(movie) {
             ${movie.countries?.length ? `<div class="modal-meta-item"><div class="modal-meta-label">Country</div><div class="modal-meta-value">${movie.countries[0]}</div></div>` : ''}
           </div>
           ${movie.cast?.length ? `<div style="margin-bottom:16px"><div class="modal-meta-label" style="margin-bottom:6px">Cast</div><div style="font-size:0.82rem;color:var(--text-muted)">${movie.cast.join(' · ')}</div></div>` : ''}
+          ${movie.streamingOn?.length ? `<div style="margin-bottom:16px"><div class="modal-meta-label" style="margin-bottom:6px">Streaming On (US)</div><div style="font-size:0.82rem;color:var(--accent)">${movie.streamingOn.join(' · ')}</div></div>` : ''}
         </div>
         ${movie.overview ? `<div class="modal-overview">"${escHtml(movie.overview)}"</div>` : ''}
       </div>
@@ -2007,6 +2054,9 @@ async function fixByTmdbId() {
     const detail = await fetchMovieDetail(id);
     if (!detail || detail.status_code === 34) { setFixStatus('Movie not found for that ID.', true); return; }
 
+    const providers = detail?.['watch/providers']?.results?.US?.flatrate || [];
+    const streamingOn = providers.slice(0, 3).map(p => p.provider_name);
+
     const movie = {
       id: String(detail.id),
       searchTitle: detail.title,
@@ -2025,6 +2075,7 @@ async function fixByTmdbId() {
       countries: detail.production_countries?.map(c => c.name) || [],
       language: detail.original_language,
       tmdbId: String(detail.id),
+      streamingOn,
       notFound: false
     };
     applyMovieFix(movie);
