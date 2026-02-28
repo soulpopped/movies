@@ -1301,6 +1301,7 @@
       <button class="sort-btn" data-sort="year" onclick="setSort(this)">Year</button>
       <button class="sort-btn" data-sort="rating" onclick="setSort(this)">Rating</button>
       <button class="sort-btn" data-sort="runtime" onclick="setSort(this)">Runtime</button>
+      <button class="sort-btn" data-sort="dateAdded" onclick="setSort(this)">Date Added</button>
     </div>
   </div>
 
@@ -1560,9 +1561,9 @@ async function startImport() {
     try {
       const movie = await fetchMovie(title);
       if (movie) results.push(movie);
-      else results.push({ id: `notfound_${i}`, title, searchTitle: title, notFound: true });
+      else results.push({ id: `notfound_${i}`, title, searchTitle: title, notFound: true, dateAdded: new Date().toISOString() });
     } catch (err) {
-      results.push({ id: `error_${i}`, title, searchTitle: title, notFound: true });
+      results.push({ id: `error_${i}`, title, searchTitle: title, notFound: true, dateAdded: new Date().toISOString() });
     }
     await sleep(80); // rate limit
   }
@@ -1620,6 +1621,7 @@ async function fetchMovie(titleStr) {
     language: detail?.original_language || result.original_language,
     tmdbId: String(result.id),
     streamingOn,
+    dateAdded: new Date().toISOString(),
     notFound: false
   };
 }
@@ -1808,6 +1810,11 @@ function sortMovies() {
     if (currentSort === 'year') return parseInt(b.year||0) - parseInt(a.year||0);
     if (currentSort === 'rating') return (b.rating||0) - (a.rating||0);
     if (currentSort === 'runtime') return (a.runtime||999) - (b.runtime||999);
+    if (currentSort === 'dateAdded') {
+      const aDate = new Date(a.dateAdded || 0).getTime();
+      const bDate = new Date(b.dateAdded || 0).getTime();
+      return bDate - aDate; // newest first
+    }
     return 0;
   });
 }
@@ -2105,7 +2112,7 @@ async function applyMovieFix(newMovieData) {
     try { await sbDeleteMovie(fixTargetId); } catch(e) { console.warn('Delete old failed', e); }
   }
 
-  movies[idx] = { ...newMovieData, searchTitle: movies[idx].searchTitle || newMovieData.title };
+  movies[idx] = { ...newMovieData, searchTitle: movies[idx].searchTitle || newMovieData.title, dateAdded: movies[idx].dateAdded || new Date().toISOString() };
   try { await sbSaveMovie(movies[idx]); } catch(e) { console.warn('Save fix failed', e); }
 
   buildFilterOptions();
